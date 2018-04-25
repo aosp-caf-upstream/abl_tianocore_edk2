@@ -204,8 +204,8 @@ LoadImageNoAuth (BootInfo *Info)
   CHAR16 Pname[MAX_GPT_NAME_SIZE];
 
   if (Info->Images[0].ImageBuffer != NULL && Info->Images[0].ImageSize > 0) {
-    /* fastboot boot option image already loaded */
-    return Status;
+    /* fastboot boot option, boot image is already loaded, check for dtbo */
+    goto load_dtbo;
   }
 
   Status = LoadImage (Info->Pname, (VOID **)&(Info->Images[0].ImageBuffer),
@@ -219,6 +219,8 @@ LoadImageNoAuth (BootInfo *Info)
   Info->Images[0].Name = AllocatePool (StrLen (Info->Pname) + 1);
   UnicodeStrToAsciiStr (Info->Pname, Info->Images[0].Name);
 
+
+load_dtbo:
   /*load dt overlay when avb is disabled*/
   Status = NoAVBLoadDtboImage (Info, (VOID **)&(Info->Images[1].ImageBuffer),
           (UINT32 *)&(Info->Images[1].ImageSize), Pname);
@@ -838,7 +840,7 @@ LoadImageAndAuthVB2 (BootInfo *Info)
   Data.PublicKeyLength = UserData->PublicKeyLen;
   Data.PublicKey = UserData->PublicKey;
 
-  BootImgHdr = (struct boot_img_hdr *)ImageBuffer;
+  BootImgHdr = (boot_img_hdr *)ImageBuffer;
   Data.SystemSecurityLevel = (BootImgHdr->os_version & 0x7FF);
   Data.SystemVersion = (BootImgHdr->os_version & 0xFFFFF800) >> 11;
 
