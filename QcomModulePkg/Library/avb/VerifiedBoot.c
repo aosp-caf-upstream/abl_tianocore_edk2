@@ -679,6 +679,7 @@ LoadImageAndAuthVB2 (BootInfo *Info)
     Status = EFI_OUT_OF_RESOURCES;
     goto out;
   }
+  UserData->IsMultiSlot = Info->MultiSlotBoot;
 
   if (Info->MultiSlotBoot) {
     UnicodeStrToAsciiStr (Info->Pname, PnameAscii);
@@ -810,13 +811,6 @@ LoadImageAndAuthVB2 (BootInfo *Info)
         &ImageSizeActual, &PageSize);
   if (Status != EFI_SUCCESS) {
     DEBUG ((EFI_D_ERROR, "Invalid boot image header:%r\n", Status));
-    goto out;
-  }
-
-  if (ImageSizeActual > ImageSize) {
-    Status = EFI_BUFFER_TOO_SMALL;
-    DEBUG ((EFI_D_ERROR, "Boot size in vbmeta less than actual boot image size "
-                         "flash corresponding vbmeta.img\n"));
     goto out;
   }
 
@@ -954,8 +948,11 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
     VB_HASH HashAlgorithm;
     UINT8 *SigAddr = NULL;
     UINT32 SigSize = 0;
+    CHAR8 *SystemPath = NULL;
+    UINT32 SystemPathLen = 0;
 
     /*Load image*/
+    GUARD (VBAllocateCmdLine (Info));
     GUARD (VBCommonInit (Info));
     GUARD (LoadImageNoAuth (Info));
 
@@ -1017,6 +1014,15 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
         return Status;
     }
     DEBUG ((EFI_D_INFO, "VB: LoadImageAndAuthForLE complete!\n"));
+
+    if (!IsRootCmdLineUpdated (Info)) {
+        SystemPathLen = GetSystemPath (&SystemPath);
+        if (SystemPathLen == 0 ||
+            SystemPath == NULL) {
+            return EFI_LOAD_ERROR;
+        }
+        GUARD (AppendVBCmdLine (Info, SystemPath));
+    }
     return Status;
 }
 
