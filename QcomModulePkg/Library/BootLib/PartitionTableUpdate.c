@@ -834,8 +834,10 @@ PatchGpt (UINT8 *Gpt,
                  (UINT64) (NumSectors - 33));
 
   /* Patch the last partition */
-  while (*(PrimaryGptHeader + BlkSz + TotalPart * PARTITION_ENTRY_SIZE) != 0)
+  while ((TotalPart < GptHeader->MaxPtCnt) &&
+    (*(PrimaryGptHeader + BlkSz + TotalPart * PARTITION_ENTRY_SIZE) != 0)) {
     TotalPart++;
+  }
 
   LastPartOffset =
       (TotalPart - 1) * PARTITION_ENTRY_SIZE + PARTITION_ENTRY_LAST_LBA;
@@ -1575,7 +1577,7 @@ STATIC EFI_STATUS GetRecoveryDtboInfo (BootInfo *Info,
                      BootParamlistPtr->PageSize - 1);
 
   if (CHECK_ADD64 (RecoveryDtboOffset, RecoveryDtboSize)) {
-    DEBUG ((EFI_D_ERROR, "Integer Oveflow: RecoveryDtboOffset=%u "
+    DEBUG ((EFI_D_ERROR, "Integer Overflow: RecoveryDtboOffset=%u "
            "RecoveryDtboSize=%u\n", RecoveryDtboOffset, RecoveryDtboSize));
     return EFI_BAD_BUFFER_SIZE;
   }
