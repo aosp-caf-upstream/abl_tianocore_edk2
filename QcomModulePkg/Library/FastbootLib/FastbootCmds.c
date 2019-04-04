@@ -71,6 +71,7 @@ found at
 #include <Protocol/EFIUbiFlasher.h>
 #include <Protocol/SimpleTextIn.h>
 #include <Protocol/SimpleTextOut.h>
+#include <Protocol/EFIDisplayUtils.h>
 
 #include "AutoGen.h"
 #include "BootImage.h"
@@ -2274,7 +2275,7 @@ CmdBoot (CONST CHAR8 *Arg, VOID *Data, UINT32 Size)
   boot_img_hdr *hdr = Data;
   EFI_STATUS Status = EFI_SUCCESS;
   UINT32 ImageSizeActual = 0;
-  UINT32 ImageHdrSize = 0;
+  UINT32 ImageHdrSize = BOOT_IMG_MAX_PAGE_SIZE;
   UINT32 PageSize = 0;
   UINT32 SigActual = SIGACTUAL;
   CHAR8 Resp[MAX_RSP_SIZE];
@@ -2304,9 +2305,6 @@ CmdBoot (CONST CHAR8 *Arg, VOID *Data, UINT32 Size)
 
   hdr->cmdline[BOOT_ARGS_SIZE - 1] = '\0';
   SetBootDevImage ();
-
-  // Setup page size information for nv storage
-  GetPageSize (&ImageHdrSize);
 
   Status = CheckImageHeader (Data, ImageHdrSize, &ImageSizeActual,
                              &PageSize, FALSE);
@@ -2373,6 +2371,32 @@ CmdRebootBootloader (CONST CHAR8 *arg, VOID *data, UINT32 sz)
 
 #if (defined(ENABLE_DEVICE_CRITICAL_LOCK_UNLOCK_CMDS) ||                       \
      defined(ENABLE_UPDATE_PARTITIONS_CMDS))
+STATIC UINT8
+is_display_supported ( VOID )
+{
+  EFI_STATUS Status = EFI_SUCCESS;
+  EfiQcomDisplayUtilsProtocol *pDisplayUtilProtocol;
+  EFI_GUID DisplayUtilGUID = EFI_DISPLAYUTILS_PROTOCOL_GUID;
+  EFI_DISPLAY_UTILS_PANEL_CONFIG_PARAMS PanelConfig;
+  UINT32 Index = 0;
+  UINT32 ParamSize = sizeof (PanelConfig);
+  PanelConfig.uPanelIndex = Index;
+
+  if (EFI_SUCCESS == (Status = gBS->LocateProtocol (&DisplayUtilGUID,
+                                    NULL,
+                                    (VOID **)&pDisplayUtilProtocol))) {
+     Status = pDisplayUtilProtocol->DisplayUtilsGetProperty (
+                                     EFI_DISPLAY_UTILS_PANEL_CONFIG,
+                                    (VOID*)&PanelConfig, &ParamSize);
+     if ( Status == EFI_NOT_FOUND ) {
+       DEBUG ((EFI_D_VERBOSE, "Display is not supported\n"));
+       return 0;
+     }
+   }
+   DEBUG ((EFI_D_VERBOSE, "Display is enabled\n"));
+   return 1;
+}
+
 STATIC VOID
 SetDeviceUnlock (UINT32 Type, BOOLEAN State)
 {
@@ -2398,7 +2422,8 @@ SetDeviceUnlock (UINT32 Type, BOOLEAN State)
   }
 
 
-  if (GetAVBVersion () != AVB_LE) {
+  if (GetAVBVersion () != AVB_LE &&
+      is_display_supported ()) {
     Status = DisplayUnlockMenu (Type, State);
     if (Status != EFI_SUCCESS) {
       FastbootFail ("Command not support: the display is not enabled");
